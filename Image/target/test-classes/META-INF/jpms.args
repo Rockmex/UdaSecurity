@@ -1,0 +1,4 @@
+--patch-module
+Image=_
+--add-reads
+Image=ALL-UNNAMED

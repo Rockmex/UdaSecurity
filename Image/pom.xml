@@ -12,11 +12,16 @@
     <artifactId>Image</artifactId>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.source>14</maven.compiler.source>
+        <maven.compiler.target>14</maven.compiler.target>
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>com.jtransc</groupId>
+            <artifactId>jtransc-rt</artifactId>
+            <version>0.6.8</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.slf4j/slf4j-api -->
         <dependency>
             <groupId>org.slf4j</groupId>

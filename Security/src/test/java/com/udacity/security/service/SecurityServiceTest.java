@@ -6,7 +6,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -14,12 +16,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.awt.image.BufferedImage;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class SecurityServiceTest {
+public class SecurityServiceTest {
 
     @Mock
     SecurityRepository securityRepository;
@@ -79,7 +83,7 @@ class SecurityServiceTest {
     }
 
     //Test5: If a sensor is activated while already active and the system is in pending state, change it to alarm state.
-    @Test   //???   (May need to fix method)
+    @Test
     public void changeAlarmStatus_SensorActivatedWhileActiveAndAlarmStatusPending_SetStatusToAlarm(){
         sensor.setActive(true);
         when(securityService.getAlarmStatus()).thenReturn(AlarmStatus.PENDING_ALARM);
@@ -104,7 +108,7 @@ class SecurityServiceTest {
     }
 
     //Test8: If the image service identifies an image that does not contain a cat, change the status to no alarm as long as the sensors are not active.
-    @ParameterizedTest   //??? (May need to fix method)
+    @ParameterizedTest
     @ValueSource(ints = {1,3,5})
     public void changeAlarmStatus_ImageNotContainingCatAndSensorNotActive_SetStatusToNoAlarm(int sensorNum) {
         Set<Sensor> sensors = new HashSet<>();
@@ -126,8 +130,8 @@ class SecurityServiceTest {
 
     //Test10: If the system is armed, reset all sensors to inactive.
     @ParameterizedTest      //??? (Maybe need adding new method to SecurityService)
-    @ValueSource(ints = {1,3,5})
-    public void resetSensorsState_ArmingStatusArmed_SetAllSensorsToInactive(int sensorNum){
+    @MethodSource("nTestsForArmingStatus")
+    public void resetSensorsState_ArmingStatusArmed_SetAllSensorsToInactive(int sensorNum, ArmingStatus armingStatus){
         Set<Sensor> sensors = new HashSet<>();
         for (int i = 0; i < sensorNum; i++){
             Sensor dummySensor = new Sensor("sensor"+i,SensorType.DOOR);
@@ -136,7 +140,23 @@ class SecurityServiceTest {
             }
             sensors.add(dummySensor);
         }
-        verify(securityRepository).setAlarmStatus(eq(AlarmStatus.NO_ALARM));    //This is dummy code to make test fail. Fix later
+        when(securityService.getSensors()).thenReturn(sensors);
+        securityService.setArmingStatus(armingStatus);
+        for (Sensor testSensor : sensors){
+            assertEquals(false,testSensor.getActive());
+        }
+    }
+
+    //Method Source for Test10.
+    private static Stream<Arguments> nTestsForArmingStatus() {
+        return Stream.of(
+                arguments(1, ArmingStatus.ARMED_HOME),
+                arguments(2, ArmingStatus.ARMED_HOME),
+                arguments(12, ArmingStatus.ARMED_HOME),
+                arguments(1, ArmingStatus.ARMED_AWAY),
+                arguments(2, ArmingStatus.ARMED_AWAY),
+                arguments(12, ArmingStatus.ARMED_AWAY)
+        );
     }
 
     //Test11: If the system is armed-home while the camera shows a cat, set the alarm status to alarm.

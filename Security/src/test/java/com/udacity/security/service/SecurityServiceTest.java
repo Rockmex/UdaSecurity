@@ -74,12 +74,17 @@ public class SecurityServiceTest {
     }
 
     //Test4: If alarm is active, change in sensor state should not affect the alarm state.
+    //Concrete Example: Arm the system and activate two sensors, the system should go to alarm state. Then deactivate one sensor and the system should not change alarm state.
     @ParameterizedTest
     @ValueSource(booleans = {true,false})
     public void checkAlarmStatus_AlarmActiveChangeSensorState_NoAlarmStatusChanged(boolean active){
-        when(securityService.getAlarmStatus()).thenReturn(AlarmStatus.ALARM);
-        securityService.changeSensorActivationStatus(sensor,active);
-        assertEquals(AlarmStatus.ALARM,securityRepository.getAlarmStatus());
+        when(securityRepository.getAlarmStatus()).thenReturn(AlarmStatus.ALARM);
+        Sensor sensor1 = new Sensor("sensor1", SensorType.DOOR);
+        Sensor sensor2 = new Sensor("sensor2",SensorType.DOOR);
+        sensor1.setActive(true);
+        sensor2.setActive(true);
+        securityService.changeSensorActivationStatus(sensor1,active);
+        verify(securityRepository,never()).setAlarmStatus(any(AlarmStatus.class));
     }
 
     //Test5: If a sensor is activated while already active and the system is in pending state, change it to alarm state.
@@ -117,6 +122,9 @@ public class SecurityServiceTest {
         }
         when(imageService.imageContainsCat(any(),anyFloat())).thenReturn(false);
         when(securityRepository.getSensors()).thenReturn(sensors);
+        for (Sensor testSensor : securityService.getSensors()){
+            assertEquals(false,testSensor.getActive());
+        }
         securityService.processImage(bufferedImage);
         verify(securityRepository).setAlarmStatus(eq(AlarmStatus.NO_ALARM));
     }
@@ -129,22 +137,23 @@ public class SecurityServiceTest {
     }
 
     //Test10: If the system is armed, reset all sensors to inactive.
-    @ParameterizedTest      //??? (Maybe need adding new method to SecurityService)
+    //Concrete Example: put all sensors to the active state when disarmed, and then put the system in the armed state, sensors should be inactivated
+    @ParameterizedTest
     @MethodSource("nTestsForArmingStatus")
     public void resetSensorsState_ArmingStatusArmed_SetAllSensorsToInactive(int sensorNum, ArmingStatus armingStatus){
         Set<Sensor> sensors = new HashSet<>();
         for (int i = 0; i < sensorNum; i++){
             Sensor dummySensor = new Sensor("sensor"+i,SensorType.DOOR);
-            if (i%2==0){
-                dummySensor.setActive(true);
-            }
+            dummySensor.setActive(true);
             sensors.add(dummySensor);
         }
         when(securityService.getSensors()).thenReturn(sensors);
+        when(securityService.getAlarmStatus()).thenReturn(AlarmStatus.ALARM);
         securityService.setArmingStatus(armingStatus);
-        for (Sensor testSensor : sensors){
+        for (Sensor testSensor : securityService.getSensors()){
             assertEquals(false,testSensor.getActive());
         }
+        verify(securityRepository,times(sensorNum)).updateSensor(any(Sensor.class));
     }
 
     //Method Source for Test10.
@@ -160,6 +169,7 @@ public class SecurityServiceTest {
     }
 
     //Test11: If the system is armed-home while the camera shows a cat, set the alarm status to alarm.
+    //Concrete Example: Put the system as disarmed, scan a picture until it detects a cat, after that make it armed, it should make system in ALARM state
     @Test
     public void changeAlarmStatus_ArmingStatusArmedHomeAndCatDetected_SetStatusToAlarm(){
         when(securityService.getArmingStatus()).thenReturn(ArmingStatus.ARMED_HOME);

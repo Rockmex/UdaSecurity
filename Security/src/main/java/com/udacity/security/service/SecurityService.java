@@ -10,7 +10,9 @@ import com.udacity.security.data.Sensor;
 
 import java.awt.image.BufferedImage;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 /**
  * Service that receives information about changes to the security system. Responsible for
@@ -24,6 +26,7 @@ public class SecurityService {
     private ImageService imageService;
     private SecurityRepository securityRepository;
     private Set<StatusListener> statusListeners = new HashSet<>();
+    private boolean isCat = false;
 
     public SecurityService(SecurityRepository securityRepository, ImageService imageService) {
         this.securityRepository = securityRepository;
@@ -38,12 +41,18 @@ public class SecurityService {
     public void setArmingStatus(ArmingStatus armingStatus) {
         if(armingStatus == ArmingStatus.DISARMED) {
             setAlarmStatus(AlarmStatus.NO_ALARM);
+        }else if(isCat && armingStatus == ArmingStatus.ARMED_HOME){
+            setAlarmStatus(AlarmStatus.ALARM);
         }else {
-            for (Sensor sensor : getSensors()){
-                sensor.setActive(false);
+            //To Prevent ConcurrentModificationException: https://www.geeksforgeeks.org/concurrentskiplistset-in-java-with-examples/
+            ConcurrentSkipListSet<Sensor> sensors = new ConcurrentSkipListSet<>(getSensors());
+            Iterator<Sensor> iterator = sensors.iterator();
+            while (iterator.hasNext()){
+                changeSensorActivationStatus(iterator.next(),false);
             }
         }
         securityRepository.setArmingStatus(armingStatus);
+        statusListeners.forEach(StatusListener::sensorStatusChanged);
     }
 
     /**
@@ -99,6 +108,7 @@ public class SecurityService {
             return; //no problem if the system is disarmed
         }
         switch(securityRepository.getAlarmStatus()) {
+            default -> {}
             case NO_ALARM -> setAlarmStatus(AlarmStatus.PENDING_ALARM);
             case PENDING_ALARM -> setAlarmStatus(AlarmStatus.ALARM);
         }
@@ -109,6 +119,7 @@ public class SecurityService {
      */
     private void handleSensorDeactivated() {
         switch(securityRepository.getAlarmStatus()) {
+            default -> {}
             case PENDING_ALARM -> setAlarmStatus(AlarmStatus.NO_ALARM);
             case ALARM -> setAlarmStatus(AlarmStatus.PENDING_ALARM);
         }
@@ -120,15 +131,16 @@ public class SecurityService {
      * @param active
      */
     public void changeSensorActivationStatus(Sensor sensor, Boolean active) {
-        if(sensor.getActive()){
-            if (active){
+        if (getAlarmStatus() != AlarmStatus.ALARM){
+            if(sensor.getActive()){
+                if (active){
+                    handleSensorActivated();
+                }else {
+                    handleSensorDeactivated();
+                }
+            }else if(!sensor.getActive() && active){
                 handleSensorActivated();
-            }else {
-                handleSensorDeactivated();
             }
-
-        }else if(!sensor.getActive() && active){
-            handleSensorActivated();
         }
         sensor.setActive(active);
         securityRepository.updateSensor(sensor);
@@ -140,7 +152,8 @@ public class SecurityService {
      * @param currentCameraImage
      */
     public void processImage(BufferedImage currentCameraImage) {
-        catDetected(imageService.imageContainsCat(currentCameraImage, 50.0f));
+        isCat = imageService.imageContainsCat(currentCameraImage, 50.0f);
+        catDetected(isCat);
     }
 
     public AlarmStatus getAlarmStatus() {

@@ -178,4 +178,28 @@ public class SecurityServiceTest {
         verify(securityRepository).setAlarmStatus(eq(AlarmStatus.ALARM));
     }
 
+    //Additional tests to cover methods.
+    @Test
+    public void changeAlarmStatus_AlarmStatusAlarmAndDeactivateSensorWhileInactive_SetStatusToPending(){
+        when(securityService.getAlarmStatus()).thenReturn(AlarmStatus.ALARM);
+        securityService.changeSensorActivationStatus(sensor,false);
+        verify(securityRepository).setAlarmStatus(eq(AlarmStatus.PENDING_ALARM));
+    }
+
+    @Test
+    public void checkAlarmStatus_NoCatDetectedAndHaveActiveSensor_NoAlarmStatusChanged(){
+        Set<Sensor> sensors = new HashSet<>();
+        for (int i = 0; i < 5; i++){
+            Sensor dummySensor = new Sensor("sensor"+i,SensorType.DOOR);
+            if(i%2 == 0) {
+                dummySensor.setActive(true);
+            }
+            sensors.add(dummySensor);
+        }
+        when(securityService.getSensors()).thenReturn(sensors);
+        when(imageService.imageContainsCat(any(),anyFloat())).thenReturn(false);
+        securityService.processImage(bufferedImage);
+        verify(securityRepository,never()).setAlarmStatus(any());
+    }
+
 }

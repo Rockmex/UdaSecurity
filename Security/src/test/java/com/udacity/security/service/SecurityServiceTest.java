@@ -172,9 +172,9 @@ public class SecurityServiceTest {
     //Concrete Example: Put the system as disarmed, scan a picture until it detects a cat, after that make it armed, it should make system in ALARM state
     @Test
     public void changeAlarmStatus_ArmingStatusArmedHomeAndCatDetected_SetStatusToAlarm(){
-        when(securityService.getArmingStatus()).thenReturn(ArmingStatus.ARMED_HOME);
         when(imageService.imageContainsCat(any(),anyFloat())).thenReturn(true);
         securityService.processImage(bufferedImage);
+        securityService.setArmingStatus(ArmingStatus.ARMED_HOME);
         verify(securityRepository).setAlarmStatus(eq(AlarmStatus.ALARM));
     }
 
